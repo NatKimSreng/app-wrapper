@@ -1,7 +1,7 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
-import { LinkPreviewContextProvider } from 'expo-router/build/link/preview/LinkPreviewContext';
+import { View, StyleSheet } from 'react-native';
+import { WebViewScreen } from '@/components/WebViewScreen';
 import * as Notifications from 'expo-notifications';
 import { initializeNotifications } from '@/services/notifications';
 
@@ -26,9 +26,15 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <LinkPreviewContextProvider>
-        <Stack screenOptions={{ headerShown: false }} />
-      </LinkPreviewContextProvider>
+      <View style={styles.container}>
+        <WebViewScreen />
+      </View>
     </SafeAreaProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+});
