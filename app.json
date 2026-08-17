@@ -1,0 +1,78 @@
+{
+  "expo": {
+    "name": "BuildHubKH",
+    "slug": "buildhubkh-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTabletMode": true,
+      "bundleIdentifier": "com.buildhubkh.mobile",
+      "infoPlist": {
+        "NSBonjourServices": ["_http._tcp", "_https._tcp"],
+        "NSLocalNetworkUsageDescription": "Connect to local services"
+      },
+      "scheme": "buildhubkh"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.buildhubkh.mobile",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": {
+            "scheme": "https",
+            "host": "buildhubkh.com",
+            "pathPrefix": "/"
+          }
+        },
+        {
+          "action": "VIEW",
+          "data": {
+            "scheme": "buildhubkh",
+            "pathPrefix": "/"
+          }
+        }
+      ]
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "scheme": "buildhubkh",
+    "plugins": [
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icons": ["./assets/notification-icon.png"],
+          "color": "#ffffff"
+        }
+      ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "YOUR_EAS_PROJECT_ID"
+      },
+      "googleClientId": {
+        "ios": "YOUR_GOOGLE_CLIENT_ID_IOS",
+        "android": "YOUR_GOOGLE_CLIENT_ID_ANDROID"
+      },
+      "backendUrl": "https://api.buildhubkh.com"
+    }
+  }
+}
