@@ -1,5 +1,5 @@
 import React from 'react';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, StyleSheet, StatusBar } from 'react-native';
 import { WebViewScreen } from '@/components/WebViewScreen';
 import * as Notifications from 'expo-notifications';
@@ -14,11 +14,24 @@ Notifications.setNotificationHandler({
   }),
 });
 
+function AppContent() {
+  const insets = useSafeAreaInsets();
+
+  return (
+    <View style={styles.container}>
+      {/* Blue status bar background */}
+      <View style={[styles.statusBar, { height: insets.top }]} />
+      <StatusBar barStyle="light-content" />
+      
+      {/* WebView fills rest of screen */}
+      <WebViewScreen />
+    </View>
+  );
+}
+
 export default function RootLayout() {
   React.useEffect(() => {
-    // Initialize notifications
     const unsubscribe = initializeNotifications();
-    
     return () => {
       unsubscribe?.();
     };
@@ -26,10 +39,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar backgroundColor="#174E95" barStyle="light-content" />
-      <View style={styles.container}>
-        <WebViewScreen />
-      </View>
+      <AppContent />
     </SafeAreaProvider>
   );
 }
@@ -37,5 +47,9 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  statusBar: {
+    backgroundColor: '#174E95',
+    width: '100%',
   },
 });
