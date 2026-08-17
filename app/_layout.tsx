@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Slot } from 'expo-router';
+import { Stack } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { initializeNotifications } from '@/services/notifications';
 
@@ -25,7 +25,7 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Slot />
+      <Stack screenOptions={{ headerShown: false }} />
     </SafeAreaProvider>
   );
 }
