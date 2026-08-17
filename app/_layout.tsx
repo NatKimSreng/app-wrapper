@@ -1,6 +1,6 @@
 import React from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Stack } from 'expo-router';
+import { Stack, LinkPreviewContextProvider } from 'expo-router';
 import * as Notifications from 'expo-notifications';
 import { initializeNotifications } from '@/services/notifications';
 
@@ -25,14 +25,16 @@ export default function RootLayout() {
 
   return (
     <SafeAreaProvider>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animationEnabled: true,
-        }}
-      >
-        <Stack.Screen name="index" />
-      </Stack>
+      <LinkPreviewContextProvider>
+        <Stack
+          screenOptions={{
+            headerShown: false,
+            animationEnabled: true,
+          }}
+        >
+          <Stack.Screen name="index" />
+        </Stack>
+      </LinkPreviewContextProvider>
     </SafeAreaProvider>
   );
 }

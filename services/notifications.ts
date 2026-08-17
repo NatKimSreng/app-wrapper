@@ -35,8 +35,15 @@ export async function getExpoPushToken(): Promise<string | null> {
 
     // Get the token
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-    if (!projectId) {
-      console.error('EAS Project ID not configured');
+    if (!projectId || projectId === 'YOUR_EAS_PROJECT_ID') {
+      console.log('EAS Project ID not configured, skipping push token');
+      return null;
+    }
+
+    // Validate projectId format (UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(projectId)) {
+      console.log('Invalid EAS Project ID format, skipping push token');
       return null;
     }
 
