@@ -5,9 +5,7 @@ import {
   ActivityIndicator,
   BackHandler,
   Alert,
-  StatusBar,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import WebView from 'react-native-webview';
 import { initiateGoogleLogin } from '@/services/googleAuth';
 import { useNotificationNavigation } from '@/services/notifications';
@@ -17,7 +15,6 @@ import type { WebViewMessageEvent } from 'react-native-webview';
 const BUILDHUBKH_URL = 'https://buildhubkh.com';
 
 export function WebViewScreen() {
-  const insets = useSafeAreaInsets();
   const webViewRef = useRef<WebView>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -118,8 +115,7 @@ export function WebViewScreen() {
 
   if (error) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <View style={styles.container}>
         <View style={styles.errorContainer}>
           <View style={styles.errorContent}>
             <View style={styles.errorIcon}>
@@ -130,12 +126,7 @@ export function WebViewScreen() {
               <View style={styles.errorMessage}>{error}</View>
             </View>
             <View
-              style={[
-                styles.retryButton,
-                {
-                  paddingBottom: insets.bottom,
-                },
-              ]}
+              style={styles.retryButton}
             >
               <View
                 style={styles.retryButtonContent}
@@ -151,8 +142,7 @@ export function WebViewScreen() {
   }
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+    <View style={styles.container}>
       {isLoading && (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#0066cc" />
