@@ -4,13 +4,7 @@
     "slug": "buildhubkh-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
     "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTabletMode": true,
@@ -22,10 +16,6 @@
       "scheme": "buildhubkh"
     },
     "android": {
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      },
       "package": "com.buildhubkh.mobile",
       "intentFilters": [
         {
@@ -47,16 +37,20 @@
       ]
     },
     "web": {
-      "favicon": "./assets/favicon.png",
       "bundler": "metro"
     },
     "scheme": "buildhubkh",
     "plugins": [
-      "expo-router",
+      [
+        "expo-router",
+        {
+          "origin": false,
+          "asyncRoutes": true
+        }
+      ],
       [
         "expo-notifications",
         {
-          "icons": ["./assets/notification-icon.png"],
           "color": "#ffffff"
         }
       ]
