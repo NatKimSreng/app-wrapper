@@ -4,10 +4,50 @@
 const ALLOWED_DOMAINS = [
   'buildhubkh.com',
   'www.buildhubkh.com',
+  // Supabase auth/OAuth redirects
+  'onnnmkybphlmjwlwqbqv.supabase.co',
+  // Lovable OAuth broker (used by web app for Google login)
+  'lovable.app',
+  'lovable.cloud',
+  'lovable.dev',
+  'ai.gateway.lovable.dev',
+  'connector-gateway.lovable.dev',
   // Google OAuth domains
   'accounts.google.com',
   'oauth2.googleapis.com',
+  'google.com',
+  'www.google.com',
+  // Apple OAuth (if used)
+  'appleid.apple.com',
 ];
+
+/**
+ * Check if URL is an OAuth/auth redirect (should not trigger "blocked" alert)
+ */
+export function isOAuthURL(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    const pathname = parsed.pathname || '';
+    const search = parsed.search || '';
+    const hostname = parsed.hostname || '';
+    return (
+      pathname.includes('/auth/') ||
+      pathname.includes('/oauth') ||
+      pathname.includes('/callback') ||
+      pathname.includes('/signin') ||
+      search.includes('code=') ||
+      search.includes('token=') ||
+      search.includes('auth=') ||
+      hostname.includes('supabase.co') ||
+      hostname.includes('lovable.app') ||
+      hostname.includes('lovable.cloud') ||
+      hostname.includes('lovable.dev') ||
+      hostname.includes('googleusercontent.com')
+    );
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Validate if a URL is safe to navigate to

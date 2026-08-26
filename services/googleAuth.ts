@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
@@ -38,15 +39,51 @@ export function setGoogleAuthConfig(config: GoogleAuthConfig) {
 }
 
 /**
+ * Generate PKCE code_verifier (128 chars of random URL-safe characters)
+ */
+function generateCodeVerifier() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~';
+  return Array.from({ length: 128 }, () =>
+    chars.charAt(Math.floor(Math.random() * chars.length))
+  ).join('');
+}
+
+/**
+ * Generate PKCE code_challenge = base64url(sha256(code_verifier))
+ * Uses Web Crypto API, which works in React Native
+ */
+async function generateCodeChallenge(verifier: string): Promise<string> {
+  try {
+    const encoder = new TextEncoder();
+    const data = encoder.encode(verifier);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashString = String.fromCharCode(...hashArray);
+    return btoa(hashString)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '');
+  } catch {
+    // Fallback if crypto.subtle is unavailable
+    return verifier;
+  }
+}
+
+/**
  * Initiate Google login flow
  * Uses system browser for OAuth to work reliably with WebView cookie sharing
  */
 export async function initiateGoogleLogin(): Promise<GoogleAuthResult> {
   try {
-    const clientId = googleConfig.clientIdAndroid || googleConfig.clientIdIOS;
+    // Use platform-specific client ID
+    const isIOS = Platform.OS === 'ios';
+    const clientId = isIOS
+      ? googleConfig.clientIdIOS
+      : googleConfig.clientIdAndroid;
+
     if (!clientId) {
       return {
-        error: 'Google Client ID not configured',
+        error: `Google Client ID not configured for ${isIOS ? 'iOS' : 'Android'}`,
       };
     }
 
@@ -57,6 +94,10 @@ export async function initiateGoogleLogin(): Promise<GoogleAuthResult> {
       };
     }
 
+    // Generate PKCE parameters
+    const codeVerifier = generateCodeVerifier();
+    const codeChallenge = await generateCodeChallenge(codeVerifier);
+
     // Build OAuth authorization URL
     const authUrl = new URL(GOOGLE_OAUTH_ENDPOINT);
     authUrl.searchParams.append('client_id', clientId);
@@ -65,6 +106,8 @@ export async function initiateGoogleLogin(): Promise<GoogleAuthResult> {
     authUrl.searchParams.append('scope', 'openid email profile');
     authUrl.searchParams.append('access_type', 'offline');
     authUrl.searchParams.append('prompt', 'consent');
+    authUrl.searchParams.append('code_challenge', codeChallenge);
+    authUrl.searchParams.append('code_challenge_method', 'S256');
 
     // Use system browser to handle authentication
     // This avoids WebView cookie/auth issues
@@ -88,25 +131,37 @@ export async function initiateGoogleLogin(): Promise<GoogleAuthResult> {
       };
     }
 
+    // Build token exchange body
+    const tokenBody = new URLSearchParams({
+      client_id: clientId,
+      code,
+      grant_type: 'authorization_code',
+      redirect_uri: redirectUrl,
+      code_verifier: codeVerifier,
+    });
+
+    // Android OAuth clients may have a client_secret; iOS clients do not
+    if (!isIOS && googleConfig.clientIdAndroid) {
+      // Note: if your Android client ID is a "Web application" type,
+      // add its client_secret here. For "Installed" / "Android" types,
+      // leave it out.
+      // tokenBody.append('client_secret', 'YOUR_ANDROID_CLIENT_SECRET_HERE');
+    }
+
     // Exchange authorization code for tokens
     const tokenResponse = await fetch(GOOGLE_TOKEN_ENDPOINT, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body: new URLSearchParams({
-        client_id: clientId,
-        client_secret: googleConfig.clientIdAndroid || '',
-        code,
-        grant_type: 'authorization_code',
-        redirect_uri: redirectUrl,
-      }).toString(),
+      body: tokenBody.toString(),
     });
 
     if (!tokenResponse.ok) {
       const errorData = await tokenResponse.json();
+      console.error('[Google OAuth] token exchange error:', errorData);
       return {
-        error: errorData.error_description || 'Token exchange failed',
+        error: errorData.error_description || errorData.error || 'Token exchange failed',
       };
     }
 

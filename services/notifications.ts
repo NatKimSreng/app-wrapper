@@ -13,13 +13,11 @@ let lastNotificationURL: string | null = null;
  */
 export async function getExpoPushToken(): Promise<string | null> {
   try {
-    // Check if device is real (not simulator)
     if (!Device.isDevice) {
       console.log('Push notifications not available on simulator');
       return null;
     }
 
-    // Check notification permissions
     const { status: existingStatus } = await Notifications.getPermissionsAsync();
     let finalStatus = existingStatus;
 
@@ -33,14 +31,12 @@ export async function getExpoPushToken(): Promise<string | null> {
       return null;
     }
 
-    // Get the token
     const projectId = Constants.expoConfig?.extra?.eas?.projectId;
     if (!projectId || projectId === 'YOUR_EAS_PROJECT_ID') {
       console.log('EAS Project ID not configured, skipping push token');
       return null;
     }
 
-    // Validate projectId format (UUID)
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
     if (!uuidRegex.test(projectId)) {
       console.log('Invalid EAS Project ID format, skipping push token');
@@ -62,31 +58,34 @@ export async function getExpoPushToken(): Promise<string | null> {
 }
 
 /**
- * Send push token to backend
+ * Send push token to backend via WebView postMessage
+ * The web app will store it in device_tokens table
  */
-export async function sendPushTokenToBackend(token: string): Promise<boolean> {
+export function sendPushTokenToWebView(webViewRef: any, token: string): void {
   try {
-    const response = await fetch(`${BACKEND_URL}/api/mobile/push-token`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
+    const payload = JSON.stringify({
+      type: 'EXPO_PUSH_TOKEN',
+      payload: {
         token,
-        platform: Device.osName,
-      }),
+        platform: Device.osName || 'unknown',
+      },
     });
 
-    if (!response.ok) {
-      console.error('Failed to send push token to backend');
-      return false;
-    }
+    webViewRef.current?.injectJavaScript(`
+      (function() {
+        window.dispatchEvent(new MessageEvent('message', {
+          data: ${payload}
+        }));
+        // Also try to call a global handler if the web app expects it
+        if (window.handleExpoPushToken) {
+          window.handleExpoPushToken(${payload});
+        }
+      })();
+    `);
 
-    console.log('Push token sent to backend successfully');
-    return true;
+    console.log('Push token sent to web app');
   } catch (error) {
-    console.error('Error sending push token to backend:', error);
-    return false;
+    console.error('Error sending push token to web app:', error);
   }
 }
 
@@ -96,9 +95,9 @@ export async function sendPushTokenToBackend(token: string): Promise<boolean> {
 export async function handleNotificationResponse(
   response: Notifications.NotificationResponse
 ): Promise<string | null> {
-  const data = response.notification.request.content.data;
+  const data = response.notification.request.content.data as Record<string, unknown>;
 
-  if (data?.url && isValidBuildHubURL(data.url)) {
+  if (data?.url && typeof data.url === 'string' && isValidBuildHubURL(data.url)) {
     lastNotificationURL = data.url;
     return data.url;
   }
@@ -107,68 +106,66 @@ export async function handleNotificationResponse(
 }
 
 /**
- * Initialize notifications
- * Sets up listeners and requests permissions
+ * Get last notification URL for deep linking
  */
-export function initializeNotifications(): (() => void) | undefined {
-  try {
-    // Get and send push token on app start
-    getExpoPushToken().then((token) => {
-      if (token) {
-        // Store locally
-        try {
-          localStorage?.setItem('expo_push_token', token);
-        } catch (e) {
-          console.log('localStorage not available');
-        }
-
-        // Send to backend
-        sendPushTokenToBackend(token);
-      }
-    });
-
-    // Listen for notifications when app is in foreground
-    const foregroundSubscription = Notifications.addNotificationReceivedListener((notification) => {
-      console.log('Notification received:', notification);
-      
-      // Handle the notification in foreground
-      const data = notification.request.content.data;
-      if (data?.url && isValidBuildHubURL(data.url)) {
-        lastNotificationURL = data.url;
-      }
-    });
-
-    // Listen for notification responses (when user taps notification)
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
-      (response) => {
-        handleNotificationResponse(response);
-      }
-    );
-
-    return () => {
-      foregroundSubscription.remove();
-      responseSubscription.remove();
-    };
-  } catch (error) {
-    console.error('Error initializing notifications:', error);
-  }
+export function getLastNotificationURL(): string | null {
+  const url = lastNotificationURL;
+  lastNotificationURL = null; // clear after reading
+  return url;
 }
 
 /**
- * Hook to get last notification URL for navigation
+ * Hook: listen for notification URL changes
  */
 export function useNotificationNavigation(): string | null {
   const [url, setUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (lastNotificationURL) {
-      const tempURL = lastNotificationURL;
-      lastNotificationURL = null; // Reset after reading
-      setUrl(tempURL);
-    }
+    const subscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        handleNotificationResponse(response).then((navUrl) => {
+          if (navUrl) setUrl(navUrl);
+        });
+      }
+    );
+
+    return () => {
+      subscription.remove();
+    };
   }, []);
 
   return url;
+}
+
+/**
+ * Initialize notifications
+ * Sets up listeners and requests permissions
+ */
+export function initializeNotifications(): (() => void) | undefined {
+  try {
+    // Foreground notification handler
+    const foregroundSubscription = Notifications.addNotificationReceivedListener(
+      (notification) => {
+        console.log('Notification received in foreground:', notification);
+      }
+    );
+
+    // Response handler (tap on notification)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener(
+      (response) => {
+        console.log('Notification tapped:', response);
+        handleNotificationResponse(response);
+      }
+    );
+
+    return () => {
+      foregroundSubscription?.remove();
+      responseSubscription?.remove();
+    };
+  } catch (error) {
+    console.error('Error initializing notifications:', error);
+    return undefined;
+  }
 }
 
 /**

@@ -2,14 +2,17 @@ import React, { useRef, useState, useEffect } from 'react';
 import {
   View,
   StyleSheet,
-  ActivityIndicator,
   BackHandler,
-  Alert,
 } from 'react-native';
+import { BrandedLoadingScreen } from '@/components/BrandedLoadingScreen';
 import WebView from 'react-native-webview';
 import { initiateGoogleLogin } from '@/services/googleAuth';
-import { useNotificationNavigation } from '@/services/notifications';
-import { isValidBuildHubURL } from '@/utils/url';
+import {
+  getExpoPushToken,
+  sendPushTokenToWebView,
+  useNotificationNavigation,
+} from '@/services/notifications';
+import { isValidBuildHubURL, isOAuthURL } from '@/utils/url';
 import type { WebViewMessageEvent } from 'react-native-webview';
 
 const BUILDHUBKH_URL = 'https://buildhubkh.com';
@@ -55,18 +58,66 @@ export function WebViewScreen() {
       if (data.type === 'GOOGLE_LOGIN') {
         // Handle Google login from web app
         const result = await initiateGoogleLogin();
-        if (result.accessToken) {
-          // Send token back to web app
+        if (result.idToken && !result.error) {
+          // Call Supabase auth directly via REST API
           webViewRef.current?.injectJavaScript(`
-            window.dispatchEvent(new CustomEvent('googleLoginSuccess', {
-              detail: { accessToken: '${result.accessToken}', idToken: '${result.idToken}' }
-            }));
+            (async function() {
+              try {
+                const SUPABASE_URL = 'https://onnnmkybphlmjwlwqbqv.supabase.co';
+                const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9ubm5ta3licGhsbWp3bHdxYnF2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcwNzM1MTgsImV4cCI6MjA5MjY0OTUxOH0.65ApGiv6oOYr-JgarWfJ5-viAGRI-ufOIH1g_vGfoVY';
+
+                const res = await fetch(SUPABASE_URL + '/auth/v1/token?grant_type=id_token', {
+                  method: 'POST',
+                  headers: {
+                    'apikey': SUPABASE_KEY,
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    provider: 'google',
+                    id_token: '${result.idToken}',
+                  }),
+                });
+
+                const json = await res.json();
+
+                if (!res.ok || json.error) {
+                  console.error('Supabase sign-in error:', json);
+                  window.location.href = '/login?error=' + encodeURIComponent(json.error_description || json.message || 'Google login failed');
+                  return;
+                }
+
+                // Store session in localStorage so web app picks it up
+                const session = {
+                  access_token: json.access_token,
+                  refresh_token: json.refresh_token,
+                  expires_in: json.expires_in,
+                  expires_at: json.expires_at,
+                  token_type: json.token_type,
+                  user: json.user,
+                };
+                localStorage.setItem('sb-onnnmkybphlmjwlwqbqv-auth-token', JSON.stringify(session));
+
+                console.log('Google login success — redirecting to /home');
+                window.location.href = '/home';
+              } catch (e) {
+                console.error('Login error:', e);
+                window.location.href = '/login?error=google_login_failed';
+              }
+            })();
+          `);
+        } else {
+          console.error('Google login failed:', result.error);
+          webViewRef.current?.injectJavaScript(`
+            window.location.href = '/login?error=' + encodeURIComponent('${result.error || 'Google login failed'}');
           `);
         }
       } else if (data.type === 'PUSH_TOKEN_REQUEST') {
-        // Push token is handled by notifications service
-        // This is just a message from the web app acknowledging it received the token
-        console.log('Web app received push token:', data.payload);
+        // Web app is requesting the Expo push token
+        getExpoPushToken().then((token) => {
+          if (token && webViewRef.current) {
+            sendPushTokenToWebView(webViewRef, token);
+          }
+        });
       }
     } catch (err) {
       console.error('Error handling WebView message:', err);
@@ -76,9 +127,22 @@ export function WebViewScreen() {
   const handleNavigationStateChange = (navState: { canGoBack: boolean; url: string }) => {
     setCanGoBack(navState.canGoBack);
 
+    // Intercept Lovable OAuth and force native Google login instead
+    if (navState.url.includes('oauth.lovable.app') && navState.url.includes('provider=google')) {
+      console.log('Intercepted Lovable OAuth — triggering native Google login');
+      // Go back to prevent navigation
+      webViewRef.current?.goBack();
+      // Trigger native login
+      handleWebViewMessage({
+        nativeEvent: { data: JSON.stringify({ type: 'GOOGLE_LOGIN' }) }
+      } as WebViewMessageEvent);
+      return;
+    }
+
     // Validate URL to prevent navigation outside BuildHubKH
-    if (!isValidBuildHubURL(navState.url)) {
-      Alert.alert('Blocked', 'You can only navigate within buildhubkh.com');
+    // Allow OAuth/auth redirects to pass through
+    if (!isValidBuildHubURL(navState.url) && !isOAuthURL(navState.url)) {
+      console.warn('Blocked navigation to:', navState.url);
       webViewRef.current?.goBack();
     }
   };
@@ -91,15 +155,12 @@ export function WebViewScreen() {
   const handleLoadEnd = () => {
     setIsLoading(false);
 
-    // Inject push token into web app if available
-    webViewRef.current?.injectJavaScript(`
-      (async () => {
-        const token = localStorage.getItem('expo_push_token');
-        if (token) {
-          window.dispatchEvent(new CustomEvent('expoPushToken', { detail: { token } }));
-        }
-      })();
-    `);
+    // Send push token to web app when it loads
+    getExpoPushToken().then((token) => {
+      if (token && webViewRef.current) {
+        sendPushTokenToWebView(webViewRef, token);
+      }
+    });
   };
 
   const handleError = (error: any) => {
@@ -143,11 +204,7 @@ export function WebViewScreen() {
 
   return (
     <View style={styles.container}>
-      {isLoading && (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#0066cc" />
-        </View>
-      )}
+      {isLoading && <BrandedLoadingScreen />}
       <WebView
         ref={webViewRef}
         source={{ uri: BUILDHUBKH_URL }}
@@ -188,13 +245,6 @@ const styles = StyleSheet.create({
   },
   webview: {
     flex: 1,
-  },
-  loadingContainer: {
-    ...StyleSheet.absoluteFillObject,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    zIndex: 100,
   },
   errorContainer: {
     flex: 1,
