@@ -33,3 +33,7 @@ coverage/
 # Misc
 *.log
 .npmrc
+
+# Build artifacts (never commit APKs/AABs)
+*.apk
+*.aab
