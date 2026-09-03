@@ -1,18 +1,52 @@
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
+import { Platform } from 'react-native';
 import { useEffect, useState } from 'react';
 import { isValidBuildHubURL } from '@/utils/url';
 
 const BACKEND_URL = Constants.expoConfig?.extra?.backendUrl || 'https://api.buildhubkh.com';
 
+// Must match the channelId the server sends (expoPush.server.ts / fcm.server.ts).
+// On Android, expo-notifications silently drops notifications whose channel
+// does not exist, so this channel MUST be created before any push arrives.
+const PUSH_CHANNEL_ID = 'buildhub_high_v2';
+
 let lastNotificationURL: string | null = null;
+
+// Cache the push token so we don't re-request permission / re-fetch on every
+// navigation. The token is stable for the lifetime of the app install.
+let cachedPushToken: string | null = null;
+
+/**
+ * Create the Android notification channel the server targets.
+ * Must be called before any push is received, otherwise Android drops the
+ * notification because the channel does not exist.
+ */
+export async function ensurePushChannel(): Promise<void> {
+  if (Platform.OS !== 'android') return;
+  try {
+    await Notifications.setNotificationChannelAsync(PUSH_CHANNEL_ID, {
+      name: 'BuildHub alerts',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: '#2563EB',
+      sound: 'default',
+    });
+  } catch (error) {
+    console.error('Error creating notification channel:', error);
+  }
+}
 
 /**
  * Get or create Expo push token
  */
 export async function getExpoPushToken(): Promise<string | null> {
   try {
+    if (cachedPushToken) {
+      return cachedPushToken;
+    }
+
     if (!Device.isDevice) {
       console.log('Push notifications not available on simulator');
       return null;
@@ -49,6 +83,7 @@ export async function getExpoPushToken(): Promise<string | null> {
       })
     ).data;
 
+    cachedPushToken = token;
     console.log('Expo push token:', token);
     return token;
   } catch (error) {
@@ -143,6 +178,9 @@ export function useNotificationNavigation(): string | null {
  */
 export function initializeNotifications(): (() => void) | undefined {
   try {
+    // Create the Android channel before any push can arrive.
+    void ensurePushChannel();
+
     // Foreground notification handler
     const foregroundSubscription = Notifications.addNotificationReceivedListener(
       (notification) => {

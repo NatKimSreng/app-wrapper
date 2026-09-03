@@ -1,5 +1,4 @@
 import { Platform } from 'react-native';
-import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import Constants from 'expo-constants';
 
@@ -25,11 +24,24 @@ interface GoogleAuthResult {
 let googleConfig: GoogleAuthConfig = {
   clientIdIOS: Constants.expoConfig?.extra?.googleClientId?.ios,
   clientIdAndroid: Constants.expoConfig?.extra?.googleClientId?.android,
-  redirectUrl: AuthSession.makeRedirectUri({
-    scheme: 'buildhubkh',
-    path: 'oauth/google/callback',
-  }),
+  redirectUrl: undefined,
 };
+
+/**
+ * Resolve the OAuth redirect URI lazily and safely.
+ *
+ * The `auth.expo.io` proxy was deprecated and removed in recent Expo SDKs, so
+ * we use the app's own custom scheme instead. This scheme is registered in
+ * app.json (`scheme: "buildhubkh"` + the Android intent filter), so the system
+ * browser can redirect back into the app after Google auth completes.
+ *
+ * IMPORTANT: this exact redirect URI must be registered on the Google OAuth
+ * client (Android "Android" type / iOS "iOS" type clients accept custom
+ * schemes; "Web application" clients do NOT).
+ */
+function resolveRedirectUrl(): string {
+  return 'buildhubkh://oauth/google/callback';
+}
 
 /**
  * Set custom Google OAuth configuration
@@ -87,7 +99,7 @@ export async function initiateGoogleLogin(): Promise<GoogleAuthResult> {
       };
     }
 
-    const redirectUrl = googleConfig.redirectUrl;
+    const redirectUrl = googleConfig.redirectUrl || resolveRedirectUrl();
     if (!redirectUrl) {
       return {
         error: 'Redirect URL not configured',

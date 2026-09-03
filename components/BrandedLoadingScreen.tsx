@@ -37,7 +37,7 @@ const styles = StyleSheet.create({
     height: 160,
   },
   brandName: {
-    marginTop: 24,
+    marginTop: 20,
     color: '#ffffff',
     fontSize: 24,
     fontWeight: '700',

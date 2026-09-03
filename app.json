@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "BuildHubKH",
-    "slug": "buildhubkh",
+    "slug": "buildhub",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -15,7 +15,7 @@
       "**/*"
     ],
     "ios": {
-      "supportsTabletMode": true,
+      "supportsTablet": true,
       "bundleIdentifier": "com.buildhubkh.mobile",
       "infoPlist": {
         "NSBonjourServices": [
@@ -79,6 +79,14 @@
         {
           "color": "#ffffff"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "googleServicesFile": "./google-services.json"
+          }
+        }
       ]
     ],
     "extra": {
@@ -86,11 +94,11 @@
         "origin": false
       },
       "eas": {
-        "projectId": "0e05ea3f-c6fd-4d4f-a532-85a2b948c912"
+        "projectId": "49a248e5-425f-42b9-b243-85e55e41be7a"
       },
       "googleClientId": {
-        "ios": "14657723180-madlraoqa21n8a9f7ei9chigcu0uhpbm.apps.googleusercontent.com",
-        "android": "14657723180-5jf640lfagjht1i8ssgbhuft020rk7io.apps.googleusercontent.com"
+        "ios": "997514086528-6g3c05853170ioct0ijo2b43oall9sem.apps.googleusercontent.com",
+        "android": "997514086528-6g3c05853170ioct0ijo2b43oall9sem.apps.googleusercontent.com"
       },
       "backendUrl": "https://api.buildhubkh.com"
     }
