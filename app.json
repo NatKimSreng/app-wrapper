@@ -39,6 +39,7 @@
     "android": {
       "package": "com.buildhubkh.mobile",
       "versionCode": 1,
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#23517c"
@@ -80,14 +81,7 @@
           "color": "#ffffff"
         }
       ],
-      [
-        "expo-build-properties",
-        {
-          "android": {
-            "googleServicesFile": "./google-services.json"
-          }
-        }
-      ]
+      "expo-build-properties"
     ],
     "extra": {
       "router": {
